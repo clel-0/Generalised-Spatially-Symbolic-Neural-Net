@@ -1,0 +1,1 @@
+We model a continuous transformation field; a parameterized operator attached to every point in a vector space (linear map + activation). This operator field acts on input point-sets, enabling the network’s structure to morph with the input.
