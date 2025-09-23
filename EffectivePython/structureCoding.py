@@ -137,7 +137,7 @@ def applyG(state, inputMasses):
     
 
 def checkOutput(state,inputMasses,outputList): 
-    #Gaussian during training (variance is slowly decreased as location parameters converge to the right set of values), and definite during execution. 
+    #Gaussian during training (variance is slowly decreased as location parameters converge to the right set of values).
     #For a given simulation, a preset positions are already chosen
     inpPos = state["inputPositions"] #(nInp,D)
     inpM = inputMasses #(nInp,X)
