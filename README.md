@@ -1,6 +1,6 @@
 We model a continuous transformation field; a parameterized operator attached to every point in a vector space (linear map + activation). This operator field acts on input point-sets, enabling the network’s structure to morph with the input.
 
-Summarised Description:
+Summarised Description of how the Neural Net works:
 
 The model can be described through interactions between the following class of objects. While object-oriented in conceptual design, the implementation uses purely tensors and JAX functions in order to avoid the increase in memory and processing time produced by the overhead of objects and classes, and furthermore to allow for parallel computation through GPU threads:
 
@@ -15,4 +15,13 @@ The model can be described through interactions between the following class of o
   5) Boundaries: smooth boundaries for each dimension localises the environment, causing input points to actively interact with each other, using tanh to produce moderate, differentiable changes in the position of the input points, through the function 'ApplyBoundary'.
 
 
-This current model is only a small sub-component of the overall model aimed to be built. The key idea is to create a modular system of composed, generalised neural networks that will act as a buil
+Summarised Description of how Gradient Descent is used to train the Neural Net:
+
+The model is trained using normalised, stochastic gradient descent with momentum. The addition of noise and momentum is essential in training such a complex and unorthodox Neural Net. Additionally, in order to increase the accuracy of the trained NN, the training process reaches a refinement stage, where noise and momentum velocity are reduced. JAX's autodiff is used (through the jax.grad function) to calculate the loss of the current state's output from the expected output, using backpropogation.  
+
+
+Overall Aim of this Project:
+
+This project is my aim to create Artificial General Intelligence, through the development of neural nets that are produced\reused in response to a question provided, rather than running all questions through a static neural net like LLMs such as ChatGPT does, aiming to make an intelligence that truly masters an understanding in a variety of topics.
+
+This current model is only a small sub-component of the overall model aimed to be built. The key idea is to create a modular system of these generalised neural networks (let them be called 'structures') that will be composed through the connection of their I/O gates (i.e. output vectors of one structure will be fed to be the input vecs of other structures) to produce a larger Neural Network known as a 'geometry' of structures. The overall aim is to create modular library of previously created structures, that the overhead system can use, to create geometries, in response to certain questions. 
