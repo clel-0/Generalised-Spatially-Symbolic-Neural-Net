@@ -8,6 +8,8 @@ from polynomial import *
 
 
 
+
+
 #key = jax.random.PRNGKey(seed)
 def initStructure(nInp,nImm,nParam,D,X,key): #note: X is the mass vec size
     k1, k2, k3, k4, k5, k6, k7 = jax.random.split(key, 7)
@@ -43,7 +45,7 @@ def apply_boundary(state):
     sharpness = state['boundarySharpness'] #(scalar)
     def perInput(pos,vel):
         def perDim(d):
-            wall_force = (1+jax.nn.tanh((pos[d] - boundaries[d]) * sharpness[d]))/2#sigmoid wall instead of non-diff wall
+            wall_force = (1+jax.nn.tanh((pos[d] - boundaries[d]) * sharpness[d]))/2#tanh wall instead of non-diff wall
             flip_factor = 1.0 - 2.0 * wall_force
             return vel[d] * flip_factor
         
@@ -142,8 +144,7 @@ def applyG(state, inputMasses):
     
 
 def checkOutput(state,inputMasses,outputList): 
-    #Gaussian during training (variance is slowly decreased as location parameters converge to the right set of values).
-    #For a given simulation, a preset positions are already chosen
+    
     inpPos = state["inputPositions"] #(nInp,D)
     inpM = inputMasses #(nInp,X)
     outLoc = state["outputLocations"] #(nInp,D)
