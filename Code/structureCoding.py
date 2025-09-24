@@ -38,7 +38,7 @@ def apply_boundary(state):
     sharpness = state['boundarySharpness'] #(scalar)
     def perInput(pos,vel):
         def perDim(d):
-            wall_force = (1+jax.nn.tanh((pos[d] - boundaries[d]) * sharpness[d]))/2#sigmoid wall instead of non-diff wall
+            wall_force = (1+jax.nn.tanh((pos[d] - boundaries[d]) * sharpness[d]))/2#tanh wall instead of non-diff wall
             flip_factor = 1.0 - 2.0 * wall_force
             return vel[d] * flip_factor
         
@@ -137,8 +137,6 @@ def applyG(state, inputMasses):
     
 
 def checkOutput(state,inputMasses,outputList): 
-    #Gaussian during training (variance is slowly decreased as location parameters converge to the right set of values).
-    #For a given simulation, a preset positions are already chosen
     inpPos = state["inputPositions"] #(nInp,D)
     inpM = inputMasses #(nInp,X)
     outLoc = state["outputLocations"] #(nInp,D)
@@ -184,14 +182,6 @@ def lossFunction(outputList,trueOutputs):
     
 @jax.jit
 def run_and_loss(state, inputMasses, outputList, true_outputs):
-#    softState = state | { #makes positions and velocity, as well as sharpness, bounded.
-#    'inputPositions': jax.nn.sigmoid(state['inputPositions'])*state['boundaries'], #(nInp,D)
-#    'parameterPos': jax.nn.sigmoid(state['parameterPos'])*state['boundaries'],
-#    'immoveablePositions': jax.nn.sigmoid(state['immoveablePositions'])*state['boundaries'],
-#    'boundarySharpness': jax.nn.sigmoid(state['boundarySharpness']),
-#    'outputLocations': jax.nn.sigmoid(state['outputLocations'])*state['boundaries'],
-#    'inputVelocities': jax.nn.sigmoid(state['inputVelocities'])*state['maxV'],
-#    }
 
     from jax.tree_util import tree_flatten_with_path
     from jax.tree_util import DictKey
@@ -234,11 +224,6 @@ def gradDescentStep_andRefinementCheck(state, inputMasses, outputList, true_outp
         flat_filtered = [v if k in include_keys else jnp.zeros_like(v) for k, v in zip(tree.keys(), flat)]
         return jax.tree_util.tree_unflatten(treedef, flat_filtered)
 
-
-
-    
-    
-    
     
     if step == 0:
         grads_flat, _ = tree.tree_flatten(normalize_grads(grads))
@@ -337,7 +322,6 @@ def gradDescentStep_andRefinementCheck(state, inputMasses, outputList, true_outp
 #key = jax.random.PRNGKey(seed)
 def initStructure(nInp,nImm,nParam,D,X,key): #note: X is the mass vec size
     k1, k2, k3, k4, k5, k6, k7 = jax.random.split(key, 7)
-    #everything needs to be wrapped as a jnp.array()
     return{
         'inputPositions': jax.random.uniform(k1, (nInp, D))*0.1, #(nInp,D)
         'inputVelocities': jax.random.normal(k2, (nInp, D)) * 0.01, #(nInp,D)
