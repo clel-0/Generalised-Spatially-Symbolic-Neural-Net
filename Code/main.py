@@ -6,7 +6,7 @@ import jax.random as random
 import jax.tree_util as tree
 from polynomial import *
 from collections import deque
-from structureCoding import *
+from trainLoop import *
 import matplotlib.pyplot as plt
 
 
