@@ -1,6 +1,6 @@
 We model a continuous transformation field; a parameterized operator attached to every point in a vector space (linear map + activation). This operator field acts on input point-sets, enabling the network’s structure to morph with the input.
 
-Summarised Description of how the Neural Net works:
+Summary of how the Neural Net works:
 
 The model can be described through interactions between the following class of objects. While object-oriented in conceptual design, the implementation uses purely tensors and JAX functions in order to avoid the increase in memory and processing time produced by the overhead of objects and classes, and additionally to allow for parallel computation through GPU threads.
 
@@ -15,9 +15,15 @@ The model can be described through interactions between the following class of o
   5) Boundaries: smooth boundaries for each dimension localises the environment, causing input points to actively interact with each other, using tanh to produce moderate, differentiable changes in the position of the input points, through the function 'ApplyBoundary'.
 
 
-Summarised Description of how Gradient Descent is used to train the Neural Net:
+Summary of how Gradient Descent is used to train the Neural Net:
 
 The model is trained using normalised, stochastic gradient descent with momentum. The addition of noise and momentum is essential in training such a complex and unorthodox Neural Net. Additionally, in order to increase the accuracy of the trained NN, the training process reaches a refinement stage, where noise and momentum velocity are reduced. JAX's autodiff is used (through the jax.grad function) to calculate the loss of the current state's output from the expected output, using backpropogation.  
+
+
+Current results of the Model:
+
+In order to test the model's validity, randomised polynomial vector embeddings and their differentiated counterpart are randomly generated for each forward propogation through the model, and backpropogation + gradient descent is used to slightly improve the parameters of the model, to reduce loss. The model successfully reduces the loss value to approx 0.1, after around 500 forward and backward propogations. While polynomial differentiation is a linear operation and is context-free, this shows that model can successfully run without errors or the generation of invalid values. 
+
 
 
 Overall Aim of this Project:
