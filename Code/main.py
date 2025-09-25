@@ -17,7 +17,7 @@ if __name__ == '__main__':
    nInp = 10
    nImm = 2
    nParam = 2
-   d = 3
+   d = 2
    x = 21
    
 

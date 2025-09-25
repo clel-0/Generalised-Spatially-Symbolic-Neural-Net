@@ -21,6 +21,7 @@ def initStructure(nInp,nImm,nParam,D,X,key): #note: X is the mass vec size
         'immoveablePositions': jax.random.uniform(k4, (nImm, D)), #(nImm,D)
         'immoveableMasses': jax.random.normal(k5, (nImm, X)), #(nImm,X)
         'T': jax.random.normal(k6, (nParam, D, X, X))*0.1, #(nParam, D, X, X)
+        'b': jax.random.normal(k6, (nParam, X))*0.1, #(nParam, D, X) #bias term for T application
         'parameterPos': jax.random.uniform(k7, (nParam, D)), #(nParam, D)
         'kValues': jax.random.normal(key, (nInp, nImm + nInp, X)) * 0.1, #(nInp, nImm + nInp, X)
         #'outputList': jnp.zeros((nInp, X)),  # start from zero 
@@ -85,20 +86,11 @@ def stateCreator(inputPointList,immoveableList,parameterPointList,kValues,output
     }
        
 
-def applyT(state, inputMasses):
-    """
-    Applies the transformation tensor T to the input masses based on their positions and the parameter positions.
-
-    Args:
-        state (dict): The current state of the system, containing 'T', 'inputPositions', and 'parameterPos'.
-        inputMasses (jnp.ndarray): The input masses with shape (nInput, X).
-
-    Returns:
-        jnp.ndarray: The updated masses after applying the transformation, with shape (nInput, X).
-    """
+def applyT(state,inputMasses):# (nInput, X)
     T = state["T"]                      # (nParam, D, X, X)
     inputPositions = state["inputPositions"]  # (nInput, D)
     paramPos = state["parameterPos"]          # (nParam, D)
+    b = state["b"]                      # (nParam, X)
        
     # Addressing the shape of T: (nParam, D, X, X), from left to right (where T is applied to each input) (and where (X,X) is the shape of the matrix applied)
     def perInput(i_pos, i_mass):
@@ -106,12 +98,13 @@ def applyT(state, inputMasses):
             p_pos = paramPos[p_idx]           # (D,)
             def perDim(d):
                 dist = (1/(1+(p_pos[d] - i_pos[d])**2))  # scalar
-                if T[p_idx, d].shape[-1] != i_mass.shape[0]:
-                    raise ValueError(f"Shape mismatch: T[p_idx, d] has shape {T[p_idx, d].shape}, but i_mass has shape {i_mass.shape}")
-            transformed = jax.lax.map(lambda d: perDim(d), jnp.arange(T.shape[1]))  # (D, X)
+                return dist * (T[p_idx, d] @ i_mass) # (X,)
+                # T[p_idx, d] has shape (X, X), i_mass has shape (X,)
+                # The matrix multiplication results in shape (X,)
+                # The sigmoid is applied element-wise, resulting in shape (X,)
 
             transformed = jax.vmap(perDim)(jnp.arange(T.shape[1]))  # (D, X)
-            return jnp.sum(transformed, axis=0)  # (X,)
+            return jnp.sum(transformed, axis=0) + b[p_idx]  # (X,)
 
         all_params = jax.vmap(perParam)(jnp.arange(T.shape[0]))  # (nParam, X)
         return jnp.sum(all_params, axis=0)  # (X,)
