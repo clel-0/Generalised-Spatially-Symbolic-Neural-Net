@@ -85,7 +85,17 @@ def stateCreator(inputPointList,immoveableList,parameterPointList,kValues,output
     }
        
 
-def applyT(state,inputMasses):# (nInput, X)
+def applyT(state, inputMasses):
+    """
+    Applies the transformation tensor T to the input masses based on their positions and the parameter positions.
+
+    Args:
+        state (dict): The current state of the system, containing 'T', 'inputPositions', and 'parameterPos'.
+        inputMasses (jnp.ndarray): The input masses with shape (nInput, X).
+
+    Returns:
+        jnp.ndarray: The updated masses after applying the transformation, with shape (nInput, X).
+    """
     T = state["T"]                      # (nParam, D, X, X)
     inputPositions = state["inputPositions"]  # (nInput, D)
     paramPos = state["parameterPos"]          # (nParam, D)
@@ -96,7 +106,10 @@ def applyT(state,inputMasses):# (nInput, X)
             p_pos = paramPos[p_idx]           # (D,)
             def perDim(d):
                 dist = (1/(1+(p_pos[d] - i_pos[d])**2))  # scalar
-                return dist * (T[p_idx, d] @ i_mass)           # (X,)
+                if T[p_idx, d].shape[-1] != i_mass.shape[0]:
+                    raise ValueError(f"Shape mismatch: T[p_idx, d] has shape {T[p_idx, d].shape}, but i_mass has shape {i_mass.shape}")
+            transformed = jax.lax.map(lambda d: perDim(d), jnp.arange(T.shape[1]))  # (D, X)
+
             transformed = jax.vmap(perDim)(jnp.arange(T.shape[1]))  # (D, X)
             return jnp.sum(transformed, axis=0)  # (X,)
 
