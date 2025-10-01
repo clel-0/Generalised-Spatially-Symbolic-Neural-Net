@@ -12,6 +12,19 @@ from polynomial import *
 
 #key = jax.random.PRNGKey(seed)
 def initStructure(nInp,nImm,nParam,D,X,key): #note: X is the mass vec size
+    """Initialise a structure state with randomised tensors for points and parameters.
+
+    Args:
+        nInp: Number of input points in the structure.
+        nImm: Number of immoveable points exerting forces on inputs.
+        nParam: Number of parameter points defining transformation tensors.
+        D: Dimensionality of the spatial domain.
+        X: Size of each mass vector associated with a point.
+        key: PRNG key used to generate reproducible random parameters.
+
+    Returns:
+        dict: Mapping of structure components (positions, velocities, tensors, etc.).
+    """
     k1, k2, k3, k4, k5, k6, k7 = jax.random.split(key, 7)
     #everything needs to be wrapped as a jnp.array()
     return{
@@ -40,6 +53,15 @@ def initStructure(nInp,nImm,nParam,D,X,key): #note: X is the mass vec size
 
 
 def apply_boundary(state):
+    """Apply differentiable boundary reflections to input velocities.
+
+    Args:
+        state: Structure state dictionary containing positions, velocities, boundaries,
+            and sharpness parameters.
+
+    Returns:
+        dict: Updated state with boundary-adjusted `inputVelocities`.
+    """
     inpPos = state['inputPositions'] #(nInp,D)
     inpV = state['inputVelocities'] #(nInp,D)
     boundaries = state['boundaries'] #(D,)
@@ -57,6 +79,15 @@ def apply_boundary(state):
     return state | {'inputVelocities' : newV} #(nInp,D)
 
 def move(state):
+    """Advance input positions using stored velocities and global frequency.
+
+    Args:
+        state: Structure state dictionary containing `inputPositions`, `inputVelocities`,
+            and `frequency`.
+
+    Returns:
+        dict: Updated state with advanced `inputPositions`.
+    """
     inpPos = state['inputPositions'] #(nInp,D)
     inpV = state['inputVelocities'] #(nInp,D)
     newPos = inpPos + (1 / (state['frequency']**2 + 1e-2)) * inpV
@@ -64,6 +95,23 @@ def move(state):
             
 #Not used
 def stateCreator(inputPointList,immoveableList,parameterPointList,kValues,outputLocations,outputVars,boundaries,frequency,sharpness,maxV):
+    """Convert object-based inputs into the tensor-backed structure state format.
+
+    Args:
+        inputPointList: Iterable of input point objects exposing `position` and `velocity`.
+        immoveableList: Iterable of immoveable point objects with `position` and `mass`.
+        parameterPointList: Iterable providing `T_tensor` and `position` per parameter point.
+        kValues: Precomputed interaction coefficients with shape `(nInp, nInp + nImm, X)`.
+        outputLocations: Array of target output positions per input point.
+        outputVars: Variance scalars controlling output falloff.
+        boundaries: Soft boundary extents for each dimension.
+        frequency: Scalar simulation frequency.
+        sharpness: Boundary sharpness controls for each dimension.
+        maxV: Maximum velocity scale used elsewhere in simulation.
+
+    Returns:
+        dict: Structure state dictionary mirroring `initStructure` output.
+    """
     return {
         #shape is listed on the side
         #in the future, shapes may be mutable using T's that arent square 
@@ -87,6 +135,16 @@ def stateCreator(inputPointList,immoveableList,parameterPointList,kValues,output
        
 
 def applyT(state,inputMasses):# (nInput, X)
+    """Apply the parametric transformation field to each input mass vector.
+
+    Args:
+        state: Structure state providing tensors `T`, biases `b`, `inputPositions`, and
+            `parameterPos`.
+        inputMasses: Array of shape `(nInp, X)` containing current input mass vectors.
+
+    Returns:
+        jnp.ndarray: Transformed masses with the same shape as `inputMasses`.
+    """
     T = state["T"]                      # (nParam, D, X, X)
     inputPositions = state["inputPositions"]  # (nInput, D)
     paramPos = state["parameterPos"]          # (nParam, D)
@@ -118,6 +176,16 @@ def applyT(state,inputMasses):# (nInput, X)
     
 
 def applyG(state, inputMasses):
+    """Update input velocities via learned pairwise interactions.
+
+    Args:
+        state: Structure state containing positions, velocities, immoveable masses, and
+            interaction coefficients `kValues`.
+        inputMasses: Array of shape `(nInp, X)` representing current input masses.
+
+    Returns:
+        dict: Updated state with new `inputVelocities` reflecting interaction forces.
+    """
     
     kValues = state['kValues'] #(nInp, nInp+nImm, X)
     inpPos = state['inputPositions'] #(nInp,D)
@@ -150,6 +218,16 @@ def applyG(state, inputMasses):
     
 
 def checkOutput(state,inputMasses,outputList): 
+    """Aggregate each input's mass into its output accumulator based on distance falloff.
+
+    Args:
+        state: Structure state providing positions, output locations, and variance scalars.
+        inputMasses: Array of transformed masses `(nInp, X)`.
+        outputList: Running array of accumulated outputs `(nInp, X)`.
+
+    Returns:
+        jnp.ndarray: Updated output accumulator aligned with `outputList`.
+    """
     
     inpPos = state["inputPositions"] #(nInp,D)
     inpM = inputMasses #(nInp,X)
@@ -166,6 +244,16 @@ def checkOutput(state,inputMasses,outputList):
         
 
 def StructureFrame(state,inputMasses,outputList):
+    """Perform a single simulation frame of interactions, motion, and output updates.
+
+    Args:
+        state: Structure state dictionary in the format produced by `initStructure`.
+        inputMasses: Mass tensor `(nInp, X)` to transform during the frame.
+        outputList: Accumulator `(nInp, X)` for output mass collections.
+
+    Returns:
+        tuple: `(state, inputMasses, outputList)` after one frame of updates.
+    """
     #Frequency will be specified to how long one run through of runStructure actually takes
     state = applyG(state,inputMasses)
     state = move(state)
@@ -176,6 +264,16 @@ def StructureFrame(state,inputMasses,outputList):
     #ensure these are assigned properly
 
 def runStructure(state,inputMasses,outputList):
+    """Advance the structure for a fixed number of frames using a JAX loop primitive.
+
+    Args:
+        state: Initial structure state to evolve.
+        inputMasses: Initial mass tensor `(nInp, X)` for the simulated inputs.
+        outputList: Initial output accumulator `(nInp, X)`.
+
+    Returns:
+        tuple: Final `(state, inputMasses, outputList)` after the configured number of frames.
+    """
     ITERATIONS = 100.0 #number of frames
     def body_fn(i, carry):
         s, iM, oL = carry

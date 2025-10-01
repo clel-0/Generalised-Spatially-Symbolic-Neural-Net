@@ -11,6 +11,15 @@ from polynomial import *
 
 
 def lossFunction(outputList,trueOutputs):
+    """Compute mean-squared error between predicted and true output masses.
+
+    Args:
+        outputList: Array `(nInp, X)` with accumulated outputs from the structure.
+        trueOutputs: Target output array with the same shape as `outputList`.
+
+    Returns:
+        jnp.ndarray: Scalar loss measuring squared differences per input summed globally.
+    """
 
     #Mean Squared Error between outputList and trueOutputs
     #Both have shape (nInp,X)
@@ -30,6 +39,17 @@ def lossFunction(outputList,trueOutputs):
 
 @jax.jit
 def run_and_loss(state, inputMasses, outputList, true_outputs):
+    """Run the structure forward pass and evaluate regularised loss.
+
+    Args:
+        state: Structure state PyTree supplying parameters and simulation buffers.
+        inputMasses: Input mass tensor `(nInp, X)` for the current batch.
+        outputList: Output accumulator initialised for the run.
+        true_outputs: Target outputs to compare against the simulated results.
+
+    Returns:
+        jnp.ndarray: Scalar loss combining task error and L1 regularisation.
+    """
 
     #This runs the structure, and then computes the loss
     #It also applies L1 regularization to certain parameters in the structure, to push them to 0 if not needed
@@ -63,11 +83,20 @@ def run_and_loss(state, inputMasses, outputList, true_outputs):
 
 
 def normalize_grads(grads, max_norm=1.0): #only on condition that grads has gradient larger than 1
-        flat, tree_def = jax.tree_util.tree_flatten(grads)
-        total_norm = jnp.sqrt(sum([jnp.sum(x**2) for x in flat]))
-        scale = jnp.minimum(1.0, max_norm / (total_norm + 1e-8))
-        flat_scaled = [g * scale for g in flat]
-        return jax.tree_util.tree_unflatten(tree_def, flat_scaled)
+    """Rescale a gradient PyTree to enforce an ℓ2 norm ceiling.
+
+    Args:
+        grads: Gradient PyTree matching the structure state.
+        max_norm: Maximum allowed ℓ2 norm for the flattened gradient vector.
+
+    Returns:
+        PyTree: Gradients scaled proportionally when the norm exceeds `max_norm`.
+    """
+    flat, tree_def = jax.tree_util.tree_flatten(grads)
+    total_norm = jnp.sqrt(sum([jnp.sum(x**2) for x in flat]))
+    scale = jnp.minimum(1.0, max_norm / (total_norm + 1e-8))
+    flat_scaled = [g * scale for g in flat]
+    return jax.tree_util.tree_unflatten(tree_def, flat_scaled)
 
 
 
@@ -75,6 +104,32 @@ def normalize_grads(grads, max_norm=1.0): #only on condition that grads has grad
 
 
 def gradDescentStep_andRefinementCheck(state, inputMasses, outputList, true_outputs, lr, subkey, noise_scale, currentVelocity, momentum, grad_history, step, grad_dir_buffer, check_every, refineDotThresh, refineNormThresh, lr_decay,refinement_started,refinementThresh):
+    """Apply one noisy momentum update and detect when to enter refinement phase.
+
+    Args:
+        state: Current structure state PyTree.
+        inputMasses: Mass tensor `(nInp, X)` for the current batch.
+        outputList: Output accumulator aligned with `inputMasses`.
+        true_outputs: Target outputs to drive training.
+        lr: Learning rate applied to gradient updates.
+        subkey: PRNG key used for noise injection.
+        noise_scale: Standard deviation for gradient noise.
+        currentVelocity: Momentum buffer PyTree matching `state`.
+        momentum: Scalar momentum coefficient.
+        grad_history: Deque tracking recent gradient directions for refinement checks.
+        step: Current optimisation step index.
+        grad_dir_buffer: Number of recent gradients maintained in the history.
+        check_every: Interval of steps between refinement evaluations.
+        refineDotThresh: Cosine similarity threshold triggering refinement.
+        refineNormThresh: Gradient norm threshold triggering refinement.
+        lr_decay: Factor for shrinking the learning rate when refining.
+        refinement_started: Boolean flag indicating refinement mode.
+        refinementThresh: Loss threshold used to infer refinement readiness.
+
+    Returns:
+        tuple: Updated `(state, velocity, noise_scale, grad_history, refinement_started,
+            lr, momentum)` reflecting the optimisation step.
+    """
     grads = jax.grad(run_and_loss, argnums=0)(state, inputMasses, outputList, true_outputs)
     #This function applies one step of gradient descent to the structure parameters, using the gradients computed from run_and_loss
     #It also checks if refinement should be started, based on the gradient history and norms

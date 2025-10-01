@@ -14,9 +14,9 @@ import matplotlib.pyplot as plt
 if __name__ == '__main__':
    key = jax.random.PRNGKey(42)
    
-   nInp = 10
+   nInp = 5
    nImm = 2
-   nParam = 2
+   nParam = 1
    d = 2
    x = 21
    
@@ -29,7 +29,7 @@ if __name__ == '__main__':
 
    #For this one; the inputs and true_outputs are created within the training loop 
 
-   state,loss_history = train_loop(state,key)
+   state,loss_history = train_loop(x,state,key)
 
    # Plot the values
    plt.plot(jnp.log(jnp.array(loss_history)))

@@ -13,13 +13,35 @@ from trainingFunctions import *
 
 from collections import deque
 
-def train_loop(state, rng_key, #input_Output_data has shape (max_steps, nInp), where each element is a mass input paired with the target output
+def train_loop(x,state, rng_key, #input_Output_data has shape (max_steps, nInp), where each element is a mass input paired with the target output
                lr=1e-10, noise_scale=1e-5, momentum=0.9,
                lr_decay=1e-2, check_every=10, grad_dir_buffer=20,
                refineDotThresh=0.9, refineNormThresh=1e-2,
                refinementThresh = 500,
                loss_threshold=1e-4, consecutive=10, max_steps=5000, 
                save_path="saved_structure.pkl"):
+    """Train the structure parameters with noisy momentum SGD and optional refinement.
+
+    Args:
+        state: Initial structure state PyTree to optimise.
+        rng_key: Base PRNG key for stochastic components.
+        lr: Initial learning rate applied before refinement.
+        noise_scale: Magnitude of Gaussian noise added to gradients.
+        momentum: Momentum coefficient for the velocity buffer.
+        lr_decay: Multiplier applied to `lr` when refinement begins.
+        check_every: Step interval for assessing refinement criteria.
+        grad_dir_buffer: Length of gradient history stored for direction checks.
+        refineDotThresh: Cosine similarity threshold that signals refinement.
+        refineNormThresh: Gradient norm threshold that signals refinement.
+        refinementThresh: Loss threshold used to gauge readiness for refinement.
+        loss_threshold: Target loss for determining convergence.
+        consecutive: Number of successive low-loss steps required to stop training.
+        max_steps: Maximum number of optimisation steps to execute.
+        save_path: Filesystem path used when persisting the trained state.
+
+    Returns:
+        tuple: `(state, loss_history)` containing the final state and list of loss values.
+    """
     
     currentVelocity = tree.tree_map(jnp.zeros_like, state)
     loss_history = []
@@ -33,7 +55,7 @@ def train_loop(state, rng_key, #input_Output_data has shape (max_steps, nInp), w
 
         for step in range(max_steps):
             
-            inputs, targets = generate_polynomial_dataset(10, 20, (-10, 10), step)
+            inputs, targets = generate_polynomial_dataset(state['inputPositions'].shape[0], x-1, (-10, 10), step)
             
             inputMasses = inputs
             true_outputs = targets
@@ -123,10 +145,12 @@ import pickle
 import os
 
 def save_state(state, path="saved_structure.pkl"):
+    """Serialise the provided structure state to disk using pickle."""
     with open(path, "wb") as f:
         pickle.dump(jax.device_get(state), f)
 
 def load_state(path="saved_structure.pkl"):
+    """Load a previously serialised structure state from disk."""
     with open(path, "rb") as f:
         return pickle.load(f)
 
